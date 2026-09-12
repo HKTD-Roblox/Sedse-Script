@@ -4,9 +4,9 @@ pcall(function() if gethwid then hwid = gethwid() else hwid = game:GetService("R
 
 local url = "https://keyxyz-sedse.pages.dev/v1/load?key=" .. game:GetService("HttpService"):UrlEncode(key) .. "&hwid=" .. game:GetService("HttpService"):UrlEncode(hwid) .. "&_cb=" .. tostring(os.clock())
 
-local success, result = pcall(game.HttpGet, game, url)
+local success, result = pcall(function() return game:HttpGet(url) end)
 
-if success then
+if success and result then
     if writefile then
         writefile("Sedse-Script.lua", result)
         game:GetService("StarterGui"):SetCore("SendNotification", {
