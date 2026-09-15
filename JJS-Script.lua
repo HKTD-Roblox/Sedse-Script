@@ -1,3 +1,24 @@
+-- Đặt đoạn này ở TRÊN CÙNG của script
+if not getgenv().__Zorcex_Replaced then
+    getgenv().__Zorcex_Replaced = true
+
+    local info = debug.getinfo(1, "S")
+    local src = info and info.source
+
+    if type(src) == "string" and #src > 200 then
+        -- Chỉ thay thế đúng chuỗi nằm trong dấu ngoặc kép ""
+        src = src:gsub('"Sedse JJS"', '"Zorcex Jujutsu-Shenanigans"')
+        src = src:gsub('"Sedse\'s"', '"Zorcex\'s Jujutsu-Shenanigans"')
+
+        local fn, err = loadstring(src)
+        if fn then
+            return fn()
+        else
+            warn("[Zorcex] Replace failed:", err)
+        end
+    end
+end
+
 -- [SEDSE WATERMARK] KEY: SEDSE-F064V0EF | HWID: e29d6a324cae52a13637e0b080b6ba557c6a9cdab068579dd87873250a44c328 | TIME: 1789280249158
 -- protected by Yazhen
 --[==[ Yanzhen 掌镇 | protected by Yazhen | 由 Sedse 製作 ]==]
