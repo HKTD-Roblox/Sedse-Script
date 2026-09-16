@@ -7,8 +7,8 @@ if not getgenv().__Zorcex_Replaced then
 
     if type(src) == "string" and #src > 200 then
         -- Chỉ thay thế đúng chuỗi nằm trong dấu ngoặc kép ""
-        src = src:gsub('"Sedse JJS"', '"Zorcex Jujutsu-Shenanigans"')
-        src = src:gsub('"Sedse\'s"', '"Zorcex\'s Jujutsu-Shenanigans"')
+        src = src:gsub('Sedse JJS", 'Zorcex Jujutsu-Shenanigans')
+        src = src:gsub('Sedse\'s', 'Zorcex\'s Jujutsu-Shenanigans')
 
         local fn, err = loadstring(src)
         if fn then
