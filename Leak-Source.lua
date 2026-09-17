@@ -1,4 +1,4 @@
-local key = "SEDSE-F064V0EF"
+local key = "SEDSE-XXXXXXXX"
 local hwid = "unknown"
 pcall(function() if gethwid then hwid = gethwid() else hwid = game:GetService("RbxAnalyticsService"):GetClientId() end end)
 
