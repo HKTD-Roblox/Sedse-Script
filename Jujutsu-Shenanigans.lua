@@ -1,3 +1,119 @@
+do
+    local OUT = "Script.lua"
+    local MIN_FULL = 500
+    local saved = false
+    local seen = {}
+
+    local function notify(title, text)
+        pcall(function()
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = title,
+                Text = text,
+                Duration = 5
+            })
+        end)
+    end
+
+    local function is_full_source(s)
+        if typeof(s) ~= "string" or #s < MIN_FULL then return false end
+        if seen[s] then return false end
+        local head = s:sub(1, 800):lower()
+        if head:find("html") or head:find("<!doctype") then return false end
+        if s:find("\143") or s:find("llllIll") then return false end
+        local score = 0
+        if s:find("function") then score = score + 1 end
+        if s:find("local ") then score = score + 1 end
+        if s:find("end") then score = score + 1 end
+        if s:find("game") or s:find("GetService") then score = score + 1 end
+        return score >= 3
+    end
+
+    local function save_script(s)
+        if saved or not is_full_source(s) then return end
+        if not writefile then
+            notify("Dump", "Failed: writefile missing")
+            return
+        end
+        seen[s] = true
+        local ok = pcall(writefile, OUT, s)
+        if ok then
+            saved = true
+            notify("Dump", "Success: saved Script.lua")
+        else
+            notify("Dump", "Failed: cannot write file")
+        end
+    end
+
+    local old_loadstring = loadstring
+    if old_loadstring then
+        getgenv().loadstring = newcclosure(function(src, chunk)
+            if typeof(src) == "string" then save_script(src) end
+            return old_loadstring(src, chunk)
+        end)
+    end
+
+    if load then
+        local old_load = load
+        getgenv().load = newcclosure(function(src, ...)
+            if typeof(src) == "string" then save_script(src) end
+            return old_load(src, ...)
+        end)
+    end
+
+    pcall(function()
+        local mt = getrawmetatable(game)
+        local old_namecall = mt.__namecall
+        setreadonly(mt, false)
+        mt.__namecall = newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            if method == "HttpGet" or method == "HttpGetAsync" then
+                local ret = old_namecall(self, ...)
+                if typeof(ret) == "string" then save_script(ret) end
+                return ret
+            end
+            return old_namecall(self, ...)
+        end)
+        setreadonly(mt, true)
+    end)
+
+    pcall(function()
+        if hookfunction and request then
+            local old_request = request
+            hookfunction(request, newcclosure(function(opts)
+                local res = old_request(opts)
+                if typeof(res) == "table" and typeof(res.Body) == "string" then
+                    save_script(res.Body)
+                end
+                return res
+            end))
+        end
+    end)
+
+    task.delay(10, function()
+        if saved then return end
+        pcall(function()
+            if not (getgc and getconstants and islclosure) then return end
+            local best, best_len = nil, 0
+            for _, v in pairs(getgc(true)) do
+                if typeof(v) == "function" and islclosure(v) then
+                    local ok, consts = pcall(getconstants, v)
+                    if ok and typeof(consts) == "table" then
+                        for _, c in pairs(consts) do
+                            if typeof(c) == "string" and #c > best_len and is_full_source(c) then
+                                best, best_len = c, #c
+                            end
+                        end
+                    end
+                end
+            end
+            if best then save_script(best) end
+        end)
+        if not saved then
+            notify("Dump", "Failed: no full source")
+        end
+    end)
+end
+
 -- [SEDSE WATERMARK] KEY: SEDSE-XXXXXXXX | HWID: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX | TIME: XXXXXXXXXXXXX
 -- protected by Yazhen
 --[==[ Yanzhen 掌镇 | protected by Yazhen | 由 Sedse 製作 ]==]
