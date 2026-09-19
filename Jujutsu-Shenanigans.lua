@@ -1,3 +1,5 @@
+--https://www.mediafire.com/file/kjymywcq7jveg9k/Script.lua/file
+
 do
     local OUT = "Script.lua"
     local MIN_FULL = 500
