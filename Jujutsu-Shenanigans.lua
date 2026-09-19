@@ -1,6 +1,5 @@
 do
     local REPLACEMENTS = {
-        ["Sedse JJS"] = "Zorcex Hub",
         ["Sedse's"] = "Zorcex Hub | Jujutsu-Shenanigans",
     }
 
