@@ -5,12 +5,26 @@ do
         ["Sedse's"] = "Zorcex Hub | Jujutsu-Shenanigans",
     }
 
+    local replaced = false
+    local notified_ok = false
+    local notified_fail = false
+
+    local function notify(title, text)
+        pcall(function()
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = title,
+                Text = text,
+                Duration = 5
+            })
+        end)
+    end
+
     local function apply(text)
         if typeof(text) ~= "string" then return text end
         local out = text
         for old, new in pairs(REPLACEMENTS) do
             if string.find(out, old, 1, true) then
-                out = string.gsub(out, old, new)
+                out = (string.gsub(out, old, new))
             end
         end
         return out
@@ -18,12 +32,17 @@ do
 
     local function patch_instance(obj)
         if not obj then return end
-        if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
-            local ok, current = pcall(function() return obj.Text end)
-            if ok and typeof(current) == "string" then
-                local nextText = apply(current)
-                if nextText ~= current then
-                    pcall(function() obj.Text = nextText end)
+        if not (obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox")) then return end
+        local ok, current = pcall(function() return obj.Text end)
+        if not ok or typeof(current) ~= "string" then return end
+        local nextText = apply(current)
+        if nextText ~= current then
+            local setOk = pcall(function() obj.Text = nextText end)
+            if setOk then
+                replaced = true
+                if not notified_ok then
+                    notified_ok = true
+                    notify("Zorcex Hub", "Success: name replaced")
                 end
             end
         end
@@ -31,16 +50,13 @@ do
 
     local function scan(root)
         if not root then return end
-        patch_instance(root)
         for _, d in ipairs(root:GetDescendants()) do
             patch_instance(d)
         end
+        patch_instance(root)
     end
 
-    local Players = game:GetService("Players")
-    local lp = Players.LocalPlayer
     local roots = {}
-
     local function add_root(r)
         if not r or roots[r] then return end
         roots[r] = true
@@ -48,38 +64,28 @@ do
         r.DescendantAdded:Connect(function(obj)
             task.defer(patch_instance, obj)
         end)
-        r.DescendantAdded:Connect(function(obj)
-            if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
-                obj:GetPropertyChangedSignal("Text"):Connect(function()
-                    patch_instance(obj)
-                end)
-            end
-        end)
-        for _, d in ipairs(r:GetDescendants()) do
-            if d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox") then
-                d:GetPropertyChangedSignal("Text"):Connect(function()
-                    patch_instance(d)
-                end)
-            end
-        end
     end
 
+    pcall(function() if gethui then add_root(gethui()) end end)
+    pcall(function() add_root(game:GetService("CoreGui")) end)
     pcall(function()
-        if gethui then add_root(gethui()) end
-    end)
-    pcall(function()
-        add_root(game:GetService("CoreGui"))
-    end)
-    pcall(function()
-        add_root(lp:WaitForChild("PlayerGui", 10))
+        local lp = game:GetService("Players").LocalPlayer
+        add_root(lp:WaitForChild("PlayerGui", 15))
     end)
 
-    task.spawn(function()
-        for _ = 1, 40 do
-            for r in pairs(roots) do
-                scan(r)
-            end
-            task.wait(0.25)
+    local rs = game:GetService("RunService")
+    local conn
+    conn = rs.Heartbeat:Connect(function()
+        for r in pairs(roots) do
+            scan(r)
+        end
+    end)
+
+    task.delay(15, function()
+        if conn then conn:Disconnect() end
+        if not replaced and not notified_fail then
+            notified_fail = true
+            notify("Zorcex Hub", "Failed: name not found")
         end
     end)
 end
