@@ -1,10 +1,12 @@
---https://www.mediafire.com/file/kjymywcq7jveg9k/Script.lua/file
-
 do
-    local OUT = "Script.lua"
-    local MIN_FULL = 500
-    local saved = false
-    local seen = {}
+    local REPLACEMENTS = {
+        ["Sedse JJS"] = "Zorcex Hub",
+        ["Sedse's"] = "Zorcex Hub | Jujutsu-Shenanigans",
+    }
+
+    local replaced = false
+    local notified_ok = false
+    local notified_fail = false
 
     local function notify(title, text)
         pcall(function()
@@ -16,102 +18,91 @@ do
         end)
     end
 
-    local function is_full_source(s)
-        if typeof(s) ~= "string" or #s < MIN_FULL then return false end
-        if seen[s] then return false end
-        local head = s:sub(1, 800):lower()
-        if head:find("html") or head:find("<!doctype") then return false end
-        if s:find("\143") or s:find("llllIll") then return false end
-        local score = 0
-        if s:find("function") then score = score + 1 end
-        if s:find("local ") then score = score + 1 end
-        if s:find("end") then score = score + 1 end
-        if s:find("game") or s:find("GetService") then score = score + 1 end
-        return score >= 3
-    end
-
-    local function save_script(s)
-        if saved or not is_full_source(s) then return end
-        if not writefile then
-            notify("Dump", "Failed: writefile missing")
-            return
-        end
-        seen[s] = true
-        local ok = pcall(writefile, OUT, s)
-        if ok then
-            saved = true
-            notify("Dump", "Success: saved Script.lua")
-        else
-            notify("Dump", "Failed: cannot write file")
-        end
-    end
-
-    local old_loadstring = loadstring
-    if old_loadstring then
-        getgenv().loadstring = newcclosure(function(src, chunk)
-            if typeof(src) == "string" then save_script(src) end
-            return old_loadstring(src, chunk)
-        end)
-    end
-
-    if load then
-        local old_load = load
-        getgenv().load = newcclosure(function(src, ...)
-            if typeof(src) == "string" then save_script(src) end
-            return old_load(src, ...)
-        end)
-    end
-
-    pcall(function()
-        local mt = getrawmetatable(game)
-        local old_namecall = mt.__namecall
-        setreadonly(mt, false)
-        mt.__namecall = newcclosure(function(self, ...)
-            local method = getnamecallmethod()
-            if method == "HttpGet" or method == "HttpGetAsync" then
-                local ret = old_namecall(self, ...)
-                if typeof(ret) == "string" then save_script(ret) end
-                return ret
+    local function apply(text)
+        if typeof(text) ~= "string" then return text end
+        local out = text
+        for old, new in pairs(REPLACEMENTS) do
+            if string.find(out, old, 1, true) then
+                out = string.gsub(out, old, new)
             end
-            return old_namecall(self, ...)
-        end)
-        setreadonly(mt, true)
-    end)
-
-    pcall(function()
-        if hookfunction and request then
-            local old_request = request
-            hookfunction(request, newcclosure(function(opts)
-                local res = old_request(opts)
-                if typeof(res) == "table" and typeof(res.Body) == "string" then
-                    save_script(res.Body)
-                end
-                return res
-            end))
         end
-    end)
+        return out
+    end
 
-    task.delay(10, function()
-        if saved then return end
-        pcall(function()
-            if not (getgc and getconstants and islclosure) then return end
-            local best, best_len = nil, 0
-            for _, v in pairs(getgc(true)) do
-                if typeof(v) == "function" and islclosure(v) then
-                    local ok, consts = pcall(getconstants, v)
-                    if ok and typeof(consts) == "table" then
-                        for _, c in pairs(consts) do
-                            if typeof(c) == "string" and #c > best_len and is_full_source(c) then
-                                best, best_len = c, #c
-                            end
+    local function patch_instance(obj)
+        if not obj then return end
+        if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+            local ok, current = pcall(function() return obj.Text end)
+            if ok and typeof(current) == "string" then
+                local nextText = apply(current)
+                if nextText ~= current then
+                    local setOk = pcall(function() obj.Text = nextText end)
+                    if setOk then
+                        replaced = true
+                        if not notified_ok then
+                            notified_ok = true
+                            notify("Zorcex Hub", "Success: name replaced")
                         end
                     end
                 end
             end
-            if best then save_script(best) end
+        end
+    end
+
+    local function scan(root)
+        if not root then return end
+        patch_instance(root)
+        for _, d in ipairs(root:GetDescendants()) do
+            patch_instance(d)
+        end
+    end
+
+    local Players = game:GetService("Players")
+    local lp = Players.LocalPlayer
+    local roots = {}
+
+    local function add_root(r)
+        if not r or roots[r] then return end
+        roots[r] = true
+        scan(r)
+        r.DescendantAdded:Connect(function(obj)
+            task.defer(patch_instance, obj)
+            if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+                obj:GetPropertyChangedSignal("Text"):Connect(function()
+                    patch_instance(obj)
+                end)
+            end
         end)
-        if not saved then
-            notify("Dump", "Failed: no full source")
+        for _, d in ipairs(r:GetDescendants()) do
+            if d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox") then
+                d:GetPropertyChangedSignal("Text"):Connect(function()
+                    patch_instance(d)
+                end)
+            end
+        end
+    end
+
+    pcall(function()
+        if gethui then add_root(gethui()) end
+    end)
+    pcall(function()
+        add_root(game:GetService("CoreGui"))
+    end)
+    pcall(function()
+        add_root(lp:WaitForChild("PlayerGui", 10))
+    end)
+
+    task.spawn(function()
+        for _ = 1, 40 do
+            if replaced then break end
+            for r in pairs(roots) do
+                scan(r)
+            end
+            task.wait(0.25)
+        end
+        if not replaced and not notified_fail then
+            notified_fail = true
+            notify("Zorcex Hub", "Failed: name not found")
         end
     end)
 end
