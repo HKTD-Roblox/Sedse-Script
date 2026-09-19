@@ -1,21 +1,9 @@
 do
     local REPLACEMENTS = {
+        ["Sedse JJS"] = "Zorcex Hub",
+        ["Toggle Menu"] = "Zorcex Hub",
         ["Sedse's"] = "Zorcex Hub | Jujutsu-Shenanigans",
     }
-
-    local replaced = false
-    local notified_ok = false
-    local notified_fail = false
-
-    local function notify(title, text)
-        pcall(function()
-            game:GetService("StarterGui"):SetCore("SendNotification", {
-                Title = title,
-                Text = text,
-                Duration = 5
-            })
-        end)
-    end
 
     local function apply(text)
         if typeof(text) ~= "string" then return text end
@@ -35,14 +23,7 @@ do
             if ok and typeof(current) == "string" then
                 local nextText = apply(current)
                 if nextText ~= current then
-                    local setOk = pcall(function() obj.Text = nextText end)
-                    if setOk then
-                        replaced = true
-                        if not notified_ok then
-                            notified_ok = true
-                            notify("Zorcex Hub", "Success: name replaced")
-                        end
-                    end
+                    pcall(function() obj.Text = nextText end)
                 end
             end
         end
@@ -66,6 +47,8 @@ do
         scan(r)
         r.DescendantAdded:Connect(function(obj)
             task.defer(patch_instance, obj)
+        end)
+        r.DescendantAdded:Connect(function(obj)
             if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
                 obj:GetPropertyChangedSignal("Text"):Connect(function()
                     patch_instance(obj)
@@ -93,15 +76,10 @@ do
 
     task.spawn(function()
         for _ = 1, 40 do
-            if replaced then break end
             for r in pairs(roots) do
                 scan(r)
             end
             task.wait(0.25)
-        end
-        if not replaced and not notified_fail then
-            notified_fail = true
-            notify("Zorcex Hub", "Failed: name not found")
         end
     end)
 end
